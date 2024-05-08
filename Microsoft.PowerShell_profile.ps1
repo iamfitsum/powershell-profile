@@ -2,7 +2,7 @@
 ### Version 1.03 - Refactored
 
 # Initial GitHub.com connectivity check with 1 second timeout
-$canConnectToGitHub = Test-Connection github.com -Count 1 -Quiet -TimeoutSeconds 1
+$canConnectToGitHub = Test-Connection 8.8.8.8 -Count 1 -Quiet -TimeoutSeconds 1
 
 # Import Modules and External Profiles
 # Ensure Terminal-Icons module is installed before importing
@@ -16,58 +16,100 @@ if (Test-Path($ChocolateyProfile)) {
 }
 
 # Check for Profile Updates
-function Update-Profile {
-    if (-not $global:canConnectToGitHub) {
-        Write-Host "Skipping profile update check due to GitHub.com not responding within 1 second." -ForegroundColor Yellow
-        return
-    }
+# function Update-Profile {
+#     if (-not $global:canConnectToGitHub) {
+#         Write-Host "Skipping profile update check due to GitHub.com not responding within 1 second." -ForegroundColor Yellow
+#         return
+#     }
 
-    try {
-        $url = "https://raw.githubusercontent.com/ChrisTitusTech/powershell-profile/main/Microsoft.PowerShell_profile.ps1"
-        $oldhash = Get-FileHash $PROFILE
-        Invoke-RestMethod $url -OutFile "$env:temp/Microsoft.PowerShell_profile.ps1"
-        $newhash = Get-FileHash "$env:temp/Microsoft.PowerShell_profile.ps1"
-        if ($newhash.Hash -ne $oldhash.Hash) {
-            Copy-Item -Path "$env:temp/Microsoft.PowerShell_profile.ps1" -Destination $PROFILE -Force
-            Write-Host "Profile has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
-        }
-    } catch {
-        Write-Error "Unable to check for `$profile updates"
-    } finally {
-        Remove-Item "$env:temp/Microsoft.PowerShell_profile.ps1" -ErrorAction SilentlyContinue
-    }
-}
-Update-Profile
+#     try {
+#         $url = "https://raw.githubusercontent.com/ChrisTitusTech/powershell-profile/main/Microsoft.PowerShell_profile.ps1"
+#         $oldhash = Get-FileHash $PROFILE
+#         Invoke-RestMethod $url -OutFile "$env:temp/Microsoft.PowerShell_profile.ps1"
+#         $newhash = Get-FileHash "$env:temp/Microsoft.PowerShell_profile.ps1"
+#         if ($newhash.Hash -ne $oldhash.Hash) {
+#             Copy-Item -Path "$env:temp/Microsoft.PowerShell_profile.ps1" -Destination $PROFILE -Force
+#             Write-Host "Profile has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
+#         }
+#     } catch {
+#         Write-Error "Unable to check for `$profile updates"
+#     } finally {
+#         Remove-Item "$env:temp/Microsoft.PowerShell_profile.ps1" -ErrorAction SilentlyContinue
+#     }
+# }
+# Update-Profile
+
+# function Update-PowerShell {
+#     if (-not $global:canConnectToGitHub) {
+#         Write-Host "Skipping PowerShell update check due to GitHub.com not responding within 1 second." -ForegroundColor Yellow
+#         return
+#     }
+
+#     try {
+#         Write-Host "Checking for PowerShell updates..." -ForegroundColor Cyan
+#         $updateNeeded = $false
+#         $currentVersion = $PSVersionTable.PSVersion.ToString()
+#         $gitHubApiUrl = "https://api.github.com/repos/PowerShell/PowerShell/releases/latest"
+#         $latestReleaseInfo = Invoke-RestMethod -Uri $gitHubApiUrl
+#         $latestVersion = $latestReleaseInfo.tag_name.Trim('v')
+#         if ($currentVersion -lt $latestVersion) {
+#             $updateNeeded = $true
+#         }
+
+#         if ($updateNeeded) {
+#             Write-Host "Updating PowerShell..." -ForegroundColor Yellow
+#             winget upgrade "Microsoft.PowerShell" --accept-source-agreements --accept-package-agreements
+#             Write-Host "PowerShell has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
+#         } else {
+#             Write-Host "Your PowerShell is up to date." -ForegroundColor Green
+#         }
+#     } catch {
+#         Write-Error "Failed to update PowerShell. Error: $_"
+#     }
+# }
+# Update-PowerShell
 
 function Update-PowerShell {
-    if (-not $global:canConnectToGitHub) {
-        Write-Host "Skipping PowerShell update check due to GitHub.com not responding within 1 second." -ForegroundColor Yellow
+    # Check if the system can connect to GitHub before attempting to update PowerShell
+    if (-not $canConnectToGitHub) {
+        Write-Host "Skipping PowerShell update check due to lack of internet connectivity." -ForegroundColor Yellow
         return
     }
+    $lastUpdateCheck = [datetime] (Get-ItemProperty -Path HKCU:\Software\PowerShell -Name LastUpdateCheck -ErrorAction SilentlyContinue).LastUpdateCheck
+    $currentTime = [datetime] (Get-Date)
+    $updateInterval = New-TimeSpan -Days 1
 
-    try {
-        Write-Host "Checking for PowerShell updates..." -ForegroundColor Cyan
-        $updateNeeded = $false
-        $currentVersion = $PSVersionTable.PSVersion.ToString()
-        $gitHubApiUrl = "https://api.github.com/repos/PowerShell/PowerShell/releases/latest"
-        $latestReleaseInfo = Invoke-RestMethod -Uri $gitHubApiUrl
-        $latestVersion = $latestReleaseInfo.tag_name.Trim('v')
-        if ($currentVersion -lt $latestVersion) {
-            $updateNeeded = $true
-        }
+    # Check if the last update check was more than a day ago or if it's the first check
+    if (-not $lastUpdateCheck -or ($currentTime - $lastUpdateCheck) -ge $updateInterval) {
+        try {
+            Write-Host "Checking for PowerShell updates..." -ForegroundColor Cyan
+            $currentVersion = $PSVersionTable.PSVersion.ToString()
+            $gitHubApiUrl = "https://api.github.com/repos/PowerShell/PowerShell/releases/latest"
+            $latestVersion = (Invoke-RestMethod -Uri $gitHubApiUrl).tag_name.Trim('v')
 
-        if ($updateNeeded) {
-            Write-Host "Updating PowerShell..." -ForegroundColor Yellow
-            winget upgrade "Microsoft.PowerShell" --accept-source-agreements --accept-package-agreements
-            Write-Host "PowerShell has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
-        } else {
-            Write-Host "Your PowerShell is up to date." -ForegroundColor Green
+            if ($currentVersion -lt $latestVersion) {
+                Write-Host "Updating PowerShell..." -ForegroundColor Yellow
+                winget upgrade "Microsoft.PowerShell" --accept-source-agreements --accept-package-agreements
+                Write-Host "PowerShell has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
+            } else {
+                Write-Host "Your PowerShell is up to date." -ForegroundColor Green
+            }
+
+            # Store the current timestamp as the last update check time
+            $null = New-Item -Path HKCU:\Software\PowerShell -Force
+            Set-ItemProperty -Path HKCU:\Software\PowerShell -Name LastUpdateCheck -Value $currentTime
+        } catch {
+            Write-Error "Failed to update PowerShell. Error: $_"
         }
-    } catch {
-        Write-Error "Failed to update PowerShell. Error: $_"
+    } else {
+        Write-Host "Skipping PowerShell update check. Last check was within the last 24 hours." -ForegroundColor Yellow
     }
 }
+
 Update-PowerShell
+
+
+
 
 
 # Admin Check and Prompt Customization
@@ -79,22 +121,53 @@ $adminSuffix = if ($isAdmin) { " [ADMIN]" } else { "" }
 $Host.UI.RawUI.WindowTitle = "PowerShell {0}$adminSuffix" -f $PSVersionTable.PSVersion.ToString()
 
 # Utility Functions
+# function Test-CommandExists {
+#     param($command)
+#     $exists = $null -ne (Get-Command $command -ErrorAction SilentlyContinue)
+#     return $exists
+# }
+
+# Improved function to test if a command exists
 function Test-CommandExists {
     param($command)
-    $exists = $null -ne (Get-Command $command -ErrorAction SilentlyContinue)
-    return $exists
+    return (Get-Command $command -ErrorAction SilentlyContinue) -is [System.Management.Automation.CommandInfo]
 }
 
+
 # Editor Configuration
-$EDITOR = if (Test-CommandExists nvim) { 'nvim' }
-          elseif (Test-CommandExists pvim) { 'pvim' }
-          elseif (Test-CommandExists vim) { 'vim' }
-          elseif (Test-CommandExists vi) { 'vi' }
-          elseif (Test-CommandExists code) { 'code' }
-          elseif (Test-CommandExists notepad++) { 'notepad++' }
-          elseif (Test-CommandExists sublime_text) { 'sublime_text' }
-          else { 'notepad' }
+# $EDITOR = if (Test-CommandExists nvim) { 'nvim' }
+#           elseif (Test-CommandExists pvim) { 'pvim' }
+#           elseif (Test-CommandExists vim) { 'vim' }
+#           elseif (Test-CommandExists vi) { 'vi' }
+#           elseif (Test-CommandExists code) { 'code' }
+#           elseif (Test-CommandExists notepad++) { 'notepad++' }
+#           elseif (Test-CommandExists sublime_text) { 'sublime_text' }
+#           else { 'notepad' }
+# Set-Alias -Name vim -Value $EDITOR
+
+# Check for available editors and set the default editor
+$editorMapping = @{
+    'nvim' = 'nvim'
+    'pvim' = 'pvim'
+    'vim' = 'vim'
+    'vi' = 'vi'
+    'code' = 'code'
+    'notepad++' = 'notepad++'
+    'sublime_text' = 'sublime_text'
+}
+
+$defaultEditor = 'notepad'
+$EDITOR = $defaultEditor
+
+foreach ($editor in $editorMapping.Keys) {
+    if (Test-CommandExists $editor) {
+        $EDITOR = $editorMapping[$editor]
+        break
+    }
+}
+
 Set-Alias -Name vim -Value $EDITOR
+
 
 function Edit-Profile {
     vim $PROFILE.CurrentUserAllHosts
@@ -110,6 +183,30 @@ function ff($name) {
 function Get-PubIP { (Invoke-WebRequest http://ifconfig.me/ip).Content }
 
 # System Utilities
+function dirs {
+    if($args.Count -gt 0)
+    {
+        Get-ChildItem -Recurse -Include "$args" | Foreach-Object FullName
+    }
+    else
+    {
+        Get-ChildItem -Recurse | Foreach-Object FullName
+    }
+}
+
+function admin {
+    if ($args.Count -gt 0) {
+        $argList = "& '$args'"
+        Start-Process wt -Verb runAs -ArgumentList "pwsh.exe -NoExit -Command $argList"
+    } else {
+        Start-Process wt -Verb runAs
+    }
+}
+
+# Set UNIX-like aliases for the admin command, so sudo <command> will run the command with elevated rights.
+Set-Alias -Name su -Value admin
+Set-Alias -Name sudo -Value admin
+
 function uptime {
     if ($PSVersionTable.PSVersion.Major -eq 5) {
         Get-WmiObject win32_operatingsystem | Select-Object @{Name='LastBootUpTime'; Expression={$_.ConverttoDateTime($_.lastbootuptime)}} | Format-Table -HideTableHeaders
@@ -257,7 +354,8 @@ Set-PSReadLineOption -Colors @{
 }
 
 ## Final Line to set prompt
-oh-my-posh init pwsh --config https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/cobalt2.omp.json | Invoke-Expression
+oh-my-posh init pwsh --config 'C:\Users\Fitsum\AppData\Local\Programs\oh-my-posh\themes\jblab_2021.omp.json' | Invoke-Expression
+
 if (Get-Command zoxide -ErrorAction SilentlyContinue) {
     Invoke-Expression (& { (zoxide init powershell | Out-String) })
 } else {
