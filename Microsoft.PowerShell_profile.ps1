@@ -47,36 +47,6 @@ function Update-Profile {
 
 Update-Profile
 
-# function Update-PowerShell {
-#     if (-not $global:canConnectToGitHub) {
-#         Write-Host "Skipping PowerShell update check due to GitHub.com not responding within 1 second." -ForegroundColor Yellow
-#         return
-#     }
-
-#     try {
-#         Write-Host "Checking for PowerShell updates..." -ForegroundColor Cyan
-#         $updateNeeded = $false
-#         $currentVersion = $PSVersionTable.PSVersion.ToString()
-#         $gitHubApiUrl = "https://api.github.com/repos/PowerShell/PowerShell/releases/latest"
-#         $latestReleaseInfo = Invoke-RestMethod -Uri $gitHubApiUrl
-#         $latestVersion = $latestReleaseInfo.tag_name.Trim('v')
-#         if ($currentVersion -lt $latestVersion) {
-#             $updateNeeded = $true
-#         }
-
-#         if ($updateNeeded) {
-#             Write-Host "Updating PowerShell..." -ForegroundColor Yellow
-#             winget upgrade "Microsoft.PowerShell" --accept-source-agreements --accept-package-agreements
-#             Write-Host "PowerShell has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
-#         } else {
-#             Write-Host "Your PowerShell is up to date." -ForegroundColor Green
-#         }
-#     } catch {
-#         Write-Error "Failed to update PowerShell. Error: $_"
-#     }
-# }
-# Update-PowerShell
-
 function Update-PowerShell {
     # Check if the system can connect to GitHub before attempting to update PowerShell
     if (-not $canConnectToGitHub) {
@@ -116,10 +86,6 @@ function Update-PowerShell {
 
 Update-PowerShell
 
-
-
-
-
 # Admin Check and Prompt Customization
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 function prompt {
@@ -129,13 +95,6 @@ $adminSuffix = if ($isAdmin) { " [ADMIN]" } else { "" }
 $Host.UI.RawUI.WindowTitle = "PowerShell {0}$adminSuffix" -f $PSVersionTable.PSVersion.ToString()
 
 # Utility Functions
-# function Test-CommandExists {
-#     param($command)
-#     $exists = $null -ne (Get-Command $command -ErrorAction SilentlyContinue)
-#     return $exists
-# }
-
-# Improved function to test if a command exists
 function Test-CommandExists {
     param($command)
     return (Get-Command $command -ErrorAction SilentlyContinue) -is [System.Management.Automation.CommandInfo]
@@ -143,17 +102,6 @@ function Test-CommandExists {
 
 
 # Editor Configuration
-# $EDITOR = if (Test-CommandExists nvim) { 'nvim' }
-#           elseif (Test-CommandExists pvim) { 'pvim' }
-#           elseif (Test-CommandExists vim) { 'vim' }
-#           elseif (Test-CommandExists vi) { 'vi' }
-#           elseif (Test-CommandExists code) { 'code' }
-#           elseif (Test-CommandExists notepad++) { 'notepad++' }
-#           elseif (Test-CommandExists sublime_text) { 'sublime_text' }
-#           else { 'notepad' }
-# Set-Alias -Name vim -Value $EDITOR
-
-# Check for available editors and set the default editor
 $editorMapping = @{
     'nvim' = 'nvim'
     'pvim' = 'pvim'
