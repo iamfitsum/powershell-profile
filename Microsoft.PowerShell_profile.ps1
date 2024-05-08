@@ -23,20 +23,28 @@ function Update-Profile {
     }
 
     try {
-        $url = "https://raw.githubusercontent.com/ChrisTitusTech/powershell-profile/main/Microsoft.PowerShell_profile.ps1"
-        $oldhash = Get-FileHash $PROFILE
-        Invoke-RestMethod $url -OutFile "$env:temp/Microsoft.PowerShell_profile.ps1"
-        $newhash = Get-FileHash "$env:temp/Microsoft.PowerShell_profile.ps1"
-        if ($newhash.Hash -ne $oldhash.Hash) {
+        $url = "https://raw.githubusercontent.com/iamfitsum/powershell-profile/main/Microsoft.PowerShell_profile.ps1"
+        
+        # Get local file timestamp
+        $localTimestamp = (Get-Item $PROFILE).LastWriteTime
+        
+        # Make a HEAD request to get file metadata
+        $headRequest = Invoke-WebRequest -Uri $url -Method Head
+        $remoteTimestamp = $headRequest.Headers.LastModified
+
+        if ($remoteTimestamp -gt $localTimestamp) {
+            # Download and update the profile
+            Invoke-WebRequest -Uri $url -OutFile "$env:temp/Microsoft.PowerShell_profile.ps1"
             Copy-Item -Path "$env:temp/Microsoft.PowerShell_profile.ps1" -Destination $PROFILE -Force
             Write-Host "Profile has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
+        } else {
+            Write-Host "Your profile is up to date." -ForegroundColor Green
         }
     } catch {
-        Write-Error "Unable to check for `$profile updates"
-    } finally {
-        Remove-Item "$env:temp/Microsoft.PowerShell_profile.ps1" -ErrorAction SilentlyContinue
+        Write-Error "Unable to check for `$profile updates. Error: $_"
     }
 }
+
 Update-Profile
 
 # function Update-PowerShell {
